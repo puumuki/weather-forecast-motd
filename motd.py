@@ -3,7 +3,6 @@
 
 #https://home.openweathermap.org/users
 
-
 #import requests
 import json 
 import pystache
@@ -13,7 +12,6 @@ import os.path
 from datetime import datetime
 from datetime import date
 
-API_KEY = "878de2eb13352fabdc825fc0438dcac6"
 BASE_URL = "api.openweathermap.org"
 
 #Bash formatting styles
@@ -31,15 +29,18 @@ BASH_STYLES = {
 class OpenWeatherAPI(object): 
 
   def request_weather( self, city ):
-    with CachedHttpRequest( city ) as response:
-      output = ''
+    with Settings() as settings:
+      with CachedHttpRequest( city=settings.get('CITY'), 
+                              cache_time=settings.get('CACHE_TIME'), 
+                              api_key=settings.get('API_KEY') ) as response:
+        output = ''
 
-      if response.get('status') == 200:
-        output = self._format_output( response.get('data') )
-      else:
-        output = self._format_not_found( response )
-          
-      print( output )
+        if response.get('status') == 200:
+          output = self._format_output( response.get('data') )
+        else:
+          output = self._format_not_found( response )
+            
+        print( output )
 
   def read_template(self):
     with open('motd.mustache','r') as template_file:
@@ -71,31 +72,27 @@ class OpenWeatherAPI(object):
 
     return output
 
-  def _debug(self, data):
-    import pprint
-    pp = pprint.PrettyPrinter(indent=4)
-    pp.pprint(data)
-      
-
 class CachedHttpRequest(object):
 
-  def __init__(self, city="Tampere", force=False, cache_time = 60):
+  def __init__(self, city="Tampere", api_key="", cache_time=60, force=False):
     self._city = city
     self._force = force
+    self._api_key = api_key
     self._temp_file_path = '/var/tmp/motd-py-temp-response.json'
-    self._cache_age = cache_time#s
+    self._cache_age = cache_time
 
   def make_http_request(self, city):
-    url ="/data/2.5/weather?appid={API_KEY}&q={city}&units=metric".format( BASE_URL=BASE_URL, API_KEY=API_KEY, city=city )    
+    url ="/data/2.5/weather?appid={API_KEY}&q={city}&units=metric".format( 
+      BASE_URL=BASE_URL, 
+      API_KEY=self._api_key, 
+      city=city 
+    )    
     conn = http.client.HTTPConnection(BASE_URL)
     conn.request("GET", url)
     response = conn.getresponse()    
     data = response.read()
     conn.close()    
     return { 'status': response.status, 'data': json.loads(data), 'time': time.time() }
-
-  def cached_file_exist(self):
-    return os.path.isfile(self._temp_file_path)
 
   def load_cached_response(self):
     with open(self._temp_file_path, 'r') as rawfile:
@@ -114,7 +111,9 @@ class CachedHttpRequest(object):
     return response    
 
   def __enter__(self):
-    if self._force or (not self.cached_file_exist()) or (self.cached_file_exist() and self.is_cache_expired()):
+    cache_file_exist = os.path.isfile(self._temp_file_path)
+
+    if self._force or (not cache_file_exist) or (cache_file_exist and self.is_cache_expired()):
       response = self.make_http_request(self._city)      
       
       if response.get('status') == 200:
@@ -122,12 +121,24 @@ class CachedHttpRequest(object):
       else:
         return response
     
-    return self.cached_file_exist() and self.load_cached_response()
+    return cache_file_exist and self.load_cached_response()
 
   def __exit__(self, type, value, traceback):
     return None
 
-if __name__ == "__main__":
+class Settings(object):
+
+  def __init__(self):
+    self._file_name = 'settings.json'
     
+  def __enter__(self):
+    self._filehandle = open(self._file_name,'r')
+    return json.loads( self._filehandle.read() )
+
+  def __exit__(self, type, value, traceback):
+    self._filehandle.close()
+
+
+if __name__ == "__main__":      
   api = OpenWeatherAPI()
   api.request_weather('Tampere')
