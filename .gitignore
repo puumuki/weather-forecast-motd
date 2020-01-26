@@ -1,1 +1,6 @@
 settings.json
+build/*
+dist/*
+weather_forecast_motd.egg-info/*
+tahmatassu.md
+__pycache__/*

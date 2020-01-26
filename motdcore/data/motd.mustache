@@ -1,4 +1,6 @@
-Tassukka - {{{BASH.HEADER}}}{{response.name}}{{{BASH.ENDC}}} - {{currenttime}}
+Kello on {{currenttime}}, paikka {{{BASH.HEADER}}}{{response.name}}{{{BASH.ENDC}}}
+Järjestelmä on ollut käynnissä {{system.uptime}}
+
 Lämpötila {{{BASH.OKGREEN}}}{{response.main.temp}}{{{c}}}{{{BASH.ENDC}}} tuntuu {{{BASH.OKGREEN}}}{{response.main.feels_like}}{{{c}}}{{{BASH.ENDC}}}
 Korkein lämpötila {{{BASH.FAIL}}}{{response.main.temp_max}}{{{c}}}{{{BASH.ENDC}}} matalin {{{BASH.OKBLUE}}}{{response.main.temp_min}}{{{c}}}{{{BASH.ENDC}}}
 Paine {{{BASH.OKGREEN}}}{{response.main.pressure}}Pa{{{BASH.ENDC}}} kosteus {{{BASH.OKGREEN}}}{{response.main.humidity}}%{{{BASH.ENDC}}}

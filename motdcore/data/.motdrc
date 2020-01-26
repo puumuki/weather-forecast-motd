@@ -1,0 +1,5 @@
+
+[Default]
+API_KEY = <api key>
+CACHE_TIME = 60
+CITY = Tampere

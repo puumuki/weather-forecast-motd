@@ -1,0 +1,12 @@
+#!/usr/bin/env python3
+
+from motdcore.motd import OpenWeatherAPI
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("city", help="City or location where you wan't to get weather forecast.")
+arguments = parser.parse_args()
+
+if __name__ == "__main__":
+  api = OpenWeatherAPI()
+  api.request_weather(arguments.city)

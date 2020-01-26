@@ -11,6 +11,11 @@ import http.client
 import os.path
 from datetime import datetime
 from datetime import date
+from os.path import expanduser
+import configparser
+from datetime import timedelta
+
+BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 
 BASE_URL = "api.openweathermap.org"
 
@@ -30,9 +35,9 @@ class OpenWeatherAPI(object):
 
   def request_weather( self, city ):
     with Settings() as settings:
-      with CachedHttpRequest( city=settings.get('CITY'), 
-                              cache_time=settings.get('CACHE_TIME'), 
-                              api_key=settings.get('API_KEY') ) as response:
+      with CachedHttpRequest( city=settings.get('Default','CITY'), 
+                              cache_time=settings.getint('Default','CACHE_TIME'), 
+                              api_key=settings.get('Default','API_KEY') ) as response:
         output = ''
 
         if response.get('status') == 200:
@@ -43,13 +48,16 @@ class OpenWeatherAPI(object):
         print( output )
 
   def read_template(self):
-    with open('motd.mustache','r') as template_file:
+    
+    with open( os.path.join( BASE_PATH, 'data', 'motd.mustache'),'r') as template_file:
       return template_file.read()
 
   def _format_not_found( self, response):
     return response.get('msg')
 
   def _format_output( self, response ):
+    systeminformation = SystemInformation()
+
     template = self.read_template()
 
     now = datetime.now()
@@ -67,10 +75,26 @@ class OpenWeatherAPI(object):
       'sunset': sunset,
       'sunrise': sunrise,
       'BASH': BASH_STYLES,
+      'system': systeminformation.info(),
       'c': u'\N{DEGREE SIGN}C'
     })
 
     return output
+
+class SystemInformation(object):
+
+  def uptime(self):
+    with open('/proc/uptime', 'r') as f:
+      s = float(f.readline().split()[0])
+      hours, remainder = divmod(s, 3600)
+      minutes, seconds = divmod(remainder, 60)
+      return '{:02}h {:02}min {:02}s'.format(int(hours), int(minutes), int(seconds))
+      
+
+  def info(self):
+    return {
+      'uptime': self.uptime()
+    }
 
 class CachedHttpRequest(object):
 
@@ -129,15 +153,36 @@ class CachedHttpRequest(object):
 class Settings(object):
 
   def __init__(self):
-    self._file_name = 'settings.json'
+    home = expanduser("~")
+    self._look_up_list = [ os.path.join( home, '.motdrc'),
+                           os.path.join( home,'motdrc' ),
+                           os.path.join('etc', '.motdrc'),
+                           os.path.join('etc',' motdrc')]
     
+  def find_configuration_path(self,paths):
+    for path in paths:
+      if os.path.exists( path ):
+        return path
+
   def __enter__(self):
-    self._filehandle = open(self._file_name,'r')
-    return json.loads( self._filehandle.read() )
+    path = self.find_configuration_path( self._look_up_list )
+    
+    if path:
+      config = configparser.ConfigParser()
+      self._filehandle = open(path,'r')      
+      config.read_file(self._filehandle)
+      return config
+    else:
+      raise MotdError("Configuration file .motdrc could not be find from any searched location." + str( self._look_up_list))
 
   def __exit__(self, type, value, traceback):
     self._filehandle.close()
 
+
+class MotdError(Exception):
+    def __init__(self, message, errors=None):
+        super(MotdError, self).__init__(message)
+        self.errors = errors
 
 if __name__ == "__main__":      
   api = OpenWeatherAPI()
