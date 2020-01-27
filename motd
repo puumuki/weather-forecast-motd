@@ -1,12 +1,42 @@
 #!/usr/bin/env python3
-
+# -*- coding: utf-8 -*-
 from motdcore.motd import OpenWeatherAPI
+import logging
 import argparse
+import sys
 
-parser = argparse.ArgumentParser()
-parser.add_argument("city", help="City or location where you wan't to get weather forecast.")
-arguments = parser.parse_args()
+def main(): 
+  arguments = init_argparse()
+  logger = init_logging( arguments )  
+  logger.debug("Instantiating OpenWeatherAPI()")
+  api = OpenWeatherAPI()
+  api.request_weather(arguments.city, arguments.force)
+
+def init_argparse():
+  parser = ArgParse(description="Print message of the day")
+  parser.add_argument("city", help="City or location where you wan't to get weather forecast.")
+  parser.add_argument("--force", type=bool, default=False, help="Skip the http request cache.")
+  parser.add_argument("--verbose", default=False, action="store_true", help="Output logging to stdout.")
+  return parser.parse_args()    
+
+def init_logging( arguments ):    
+  handler = logging.StreamHandler(sys.stdout)
+  handler.setFormatter( logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s') )
+  
+  logger = logging.getLogger('motd')  
+  logger.addHandler( handler )
+  logger.setLevel( logging.ERROR )
+
+  if arguments.verbose:
+    logger.setLevel( logging.DEBUG )
+  
+  return logger
+  
+class ArgParse(argparse.ArgumentParser):
+  def error(self, message):
+    sys.stderr.write('error: %s\n' % message)
+    self.print_help()
+    sys.exit(2)    
 
 if __name__ == "__main__":
-  api = OpenWeatherAPI()
-  api.request_weather(arguments.city)
+  main()

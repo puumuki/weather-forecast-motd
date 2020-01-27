@@ -3,7 +3,7 @@
 
 #https://home.openweathermap.org/users
 
-#import requests
+import urllib
 import json 
 import pystache
 import time
@@ -14,6 +14,10 @@ from datetime import date
 from os.path import expanduser
 import configparser
 from datetime import timedelta
+import logging
+
+#Get logger ready for use.
+logger = logging.getLogger('motd')
 
 BASE_PATH = os.path.abspath(os.path.dirname(__file__))
 
@@ -33,11 +37,18 @@ BASH_STYLES = {
 
 class OpenWeatherAPI(object): 
 
-  def request_weather( self, city ):
-    with Settings() as settings:
-      with CachedHttpRequest( city=settings.get('Default','CITY'), 
+  def request_weather( self, city, force ):
+    logger.debug("Loading settings")
+    with Settings() as settings:    
+      logger.debug( dict(settings.items('Default')) )
+
+      city = city if city else settings.get('Default','CITY')
+      
+      logger.debug( "Instantiating CachedHttpRequest" )
+      with CachedHttpRequest( city=city, 
                               cache_time=settings.getint('Default','CACHE_TIME'), 
-                              api_key=settings.get('Default','API_KEY') ) as response:
+                              api_key=settings.get('Default','API_KEY'),
+                              force=force  ) as response:
         output = ''
 
         if response.get('status') == 200:
@@ -106,11 +117,13 @@ class CachedHttpRequest(object):
     self._cache_age = cache_time
 
   def make_http_request(self, city):
+    logger.debug( "Making a new http request to weather api" )
     url ="/data/2.5/weather?appid={API_KEY}&q={city}&units=metric".format( 
       BASE_URL=BASE_URL, 
       API_KEY=self._api_key, 
-      city=city 
-    )    
+      city=urllib.parse.quote( city )
+    )
+
     conn = http.client.HTTPConnection(BASE_URL)
     conn.request("GET", url)
     response = conn.getresponse()    
@@ -119,6 +132,7 @@ class CachedHttpRequest(object):
     return { 'status': response.status, 'data': json.loads(data), 'time': time.time() }
 
   def load_cached_response(self):
+    logger.debug( "Returning cached request" )
     with open(self._temp_file_path, 'r') as rawfile:
       cached_reponse = json.loads( rawfile.read() )
       cached_reponse['cached'] = True
@@ -126,10 +140,14 @@ class CachedHttpRequest(object):
 
   def is_cache_expired(self):    
     response = self.load_cached_response()
-    is_expired = response.get('time') + self._cache_age < time.time()
+    cached_city_differences = response.get('city') != self._city
+    is_expired = cached_city_differences or (response.get('time') + self._cache_age < time.time())
+    logger.debug( "Is cached request expired - " + str(is_expired))
+    logger.debug( "Cache is " + str(int(time.time() - response.get('time'))) + " s old")
     return is_expired
 
   def _store_response(self, response):
+    logger.debug("Caching the HTTP-request")
     with open(self._temp_file_path, 'w') as rawfile:
       rawfile.write( json.dumps( response) )
     return response    
@@ -138,12 +156,10 @@ class CachedHttpRequest(object):
     cache_file_exist = os.path.isfile(self._temp_file_path)
 
     if self._force or (not cache_file_exist) or (cache_file_exist and self.is_cache_expired()):
-      response = self.make_http_request(self._city)      
-      
-      if response.get('status') == 200:
-        return self._store_response( response )
-      else:
-        return response
+      response = self.make_http_request(self._city)
+      response['city'] = self._city      
+      response = self._store_response( response ) if response.get('status') == 200 else response
+      return response
     
     return cache_file_exist and self.load_cached_response()
 
@@ -162,6 +178,7 @@ class Settings(object):
   def find_configuration_path(self,paths):
     for path in paths:
       if os.path.exists( path ):
+        logger.debug("Found settings from " + path)
         return path
 
   def __enter__(self):
@@ -177,7 +194,6 @@ class Settings(object):
 
   def __exit__(self, type, value, traceback):
     self._filehandle.close()
-
 
 class MotdError(Exception):
     def __init__(self, message, errors=None):

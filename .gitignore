@@ -3,4 +3,5 @@ build/*
 dist/*
 weather_forecast_motd.egg-info/*
 tahmatassu.md
+motdcore/__pycache__/*
 __pycache__/*
