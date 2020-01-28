@@ -41,9 +41,7 @@ Configuraton file is searched from `~/.motdrc`, `~/motdrc`, `/etc/.motdrc` or `/
 
 # Final installation
 
-Search for the file called `motd.tlc` under `/etc` directory. This is a file that is executed every sign in by the system. File is accessed by the `root` user. So it's use this at your own risk! 
 
-Insert this text to some where in the motd.tlc file:
 ```
 motd
 ```
