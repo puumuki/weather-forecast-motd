@@ -127,7 +127,7 @@ class CachedHttpRequest(object):
     conn = http.client.HTTPConnection(BASE_URL)
     conn.request("GET", url)
     response = conn.getresponse()    
-    data = response.read()
+    data = response.read().decode("utf-8") 
     conn.close()    
     return { 'status': response.status, 'data': json.loads(data), 'time': time.time() }
 
